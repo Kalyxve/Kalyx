@@ -1,6 +1,7 @@
 // Prisma schema for POS application
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -94,11 +95,8 @@ model Purchase {
   supplier   Supplier       @relation(fields: [supplierId], references: [id])
   items      PurchaseItem[]
 
-  // 👇👇 NUEVO: acumulados de pagos
   paidBs  Decimal @default(0) @db.Decimal(12, 2)
   paidUsd Decimal @default(0) @db.Decimal(12, 2)
-
-  // 👇👇 NUEVO: relación con pagos
   payments PurchasePayment[]
 }
 
@@ -108,7 +106,7 @@ model PurchasePayment {
   method     PaymentMethod
   currency   Currency
   rate       Decimal       @db.Decimal(12, 6)
-  amount     Decimal       @db.Decimal(12, 2) // monto en la moneda del pago
+  amount     Decimal       @db.Decimal(12, 2)
   amountBs   Decimal       @db.Decimal(12, 2)
   amountUsd  Decimal       @db.Decimal(12, 2)
   note       String?
@@ -121,8 +119,8 @@ model PurchaseItem {
   purchaseId Int
   productId  Int
   quantity   Decimal  @db.Decimal(12, 3)
-  unitCost   Decimal  @db.Decimal(12, 2) // cost in purchase currency
-  costBs     Decimal  @db.Decimal(12, 2) // computed cost in Bs
+  unitCost   Decimal  @db.Decimal(12, 2)
+  costBs     Decimal  @db.Decimal(12, 2)
   purchase   Purchase @relation(fields: [purchaseId], references: [id])
   product    Product  @relation(fields: [productId], references: [id])
 }
@@ -154,8 +152,8 @@ model SaleItem {
   saleId    Int
   productId Int?
   quantity  Decimal  @db.Decimal(12, 3)
-  unitPrice Decimal  @db.Decimal(12, 2) // en moneda de la venta
-  priceBs   Decimal  @db.Decimal(12, 2) // calculado en Bs
+  unitPrice Decimal  @db.Decimal(12, 2)
+  priceBs   Decimal  @db.Decimal(12, 2)
   isFree    Boolean  @default(false)
   sale      Sale     @relation(fields: [saleId], references: [id])
   product   Product? @relation(fields: [productId], references: [id])
@@ -167,7 +165,7 @@ model SalePayment {
   method    PaymentMethod
   currency  Currency
   rate      Decimal       @db.Decimal(12, 6)
-  amount    Decimal       @db.Decimal(12, 2) // en moneda del pago
+  amount    Decimal       @db.Decimal(12, 2)
   amountBs  Decimal       @db.Decimal(12, 2)
   amountUsd Decimal       @db.Decimal(12, 2)
   note      String?
