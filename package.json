@@ -13,7 +13,7 @@
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
     "test": "jest --runInBand",
-    "prepare": "husky install"
+    "prepare": "if [ \"$NODE_ENV\" != \"production\" ]; then husky install; fi"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
