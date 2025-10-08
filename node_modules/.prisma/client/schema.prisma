@@ -1,0 +1,252 @@
+// Prisma schema for POS application
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int            @id @default(autoincrement())
+  role         Role
+  name         String
+  email        String         @unique
+  passwordHash String
+  active       Boolean        @default(true)
+  categories   UserCategory[]
+  sales        Sale[]         @relation("SellerSales")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model Category {
+  id             Int            @id @default(autoincrement())
+  name           String
+  prefix         String         @unique
+  active         Boolean        @default(true)
+  products       Product[]
+  userCategories UserCategory[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([prefix])
+}
+
+model Product {
+  id                 Int                 @id @default(autoincrement())
+  categoryId         Int
+  code               String
+  name               String
+  unit               Unit
+  costBs             Decimal             @db.Decimal(10, 2)
+  priceBs            Decimal             @db.Decimal(10, 2)
+  priceUsd           Decimal             @db.Decimal(10, 2)
+  stock              Decimal             @default(0) @db.Decimal(10, 3)
+  minStock           Decimal             @default(0) @db.Decimal(10, 3)
+  active             Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  category           Category            @relation(fields: [categoryId], references: [id])
+  purchaseItems      PurchaseItem[]
+  saleItems          SaleItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@unique([code])
+  @@index([categoryId, code])
+}
+
+model Client {
+  id        Int      @id @default(autoincrement())
+  name      String
+  rif       String?
+  address   String?
+  phone     String?
+  email     String?
+  active    Boolean  @default(true)
+  sales     Sale[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Supplier {
+  id        Int        @id @default(autoincrement())
+  name      String
+  rif       String?
+  address   String?
+  contact   String?
+  active    Boolean    @default(true)
+  purchases Purchase[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Purchase {
+  id         Int            @id @default(autoincrement())
+  supplierId Int
+  currency   Currency
+  rate       Decimal        @db.Decimal(12, 6)
+  totalBs    Decimal        @db.Decimal(12, 2)
+  totalUsd   Decimal        @db.Decimal(12, 2)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  supplier   Supplier       @relation(fields: [supplierId], references: [id])
+  items      PurchaseItem[]
+
+  // 👇👇 NUEVO: acumulados de pagos
+  paidBs  Decimal @default(0) @db.Decimal(12, 2)
+  paidUsd Decimal @default(0) @db.Decimal(12, 2)
+
+  // 👇👇 NUEVO: relación con pagos
+  payments PurchasePayment[]
+}
+
+model PurchasePayment {
+  id         Int           @id @default(autoincrement())
+  purchaseId Int
+  method     PaymentMethod
+  currency   Currency
+  rate       Decimal       @db.Decimal(12, 6)
+  amount     Decimal       @db.Decimal(12, 2) // monto en la moneda del pago
+  amountBs   Decimal       @db.Decimal(12, 2)
+  amountUsd  Decimal       @db.Decimal(12, 2)
+  note       String?
+  createdAt  DateTime      @default(now())
+  purchase   Purchase      @relation(fields: [purchaseId], references: [id])
+}
+
+model PurchaseItem {
+  id         Int      @id @default(autoincrement())
+  purchaseId Int
+  productId  Int
+  quantity   Decimal  @db.Decimal(12, 3)
+  unitCost   Decimal  @db.Decimal(12, 2) // cost in purchase currency
+  costBs     Decimal  @db.Decimal(12, 2) // computed cost in Bs
+  purchase   Purchase @relation(fields: [purchaseId], references: [id])
+  product    Product  @relation(fields: [productId], references: [id])
+}
+
+model Sale {
+  id            Int        @id @default(autoincrement())
+  clientId      Int?
+  sellerUserId  Int
+  currency      Currency
+  rate          Decimal    @db.Decimal(12, 6)
+  totalBs       Decimal    @db.Decimal(12, 2)
+  totalUsd      Decimal    @db.Decimal(12, 2)
+  invoiceNumber String     @unique
+  status        SaleStatus @default(OPEN)
+  paidBs        Decimal    @default(0) @db.Decimal(12, 2)
+  paidUsd       Decimal    @default(0) @db.Decimal(12, 2)
+  overrideNote  String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  client   Client?       @relation(fields: [clientId], references: [id])
+  seller   User          @relation("SellerSales", fields: [sellerUserId], references: [id])
+  items    SaleItem[]
+  payments SalePayment[]
+}
+
+model SaleItem {
+  id        Int      @id @default(autoincrement())
+  saleId    Int
+  productId Int?
+  quantity  Decimal  @db.Decimal(12, 3)
+  unitPrice Decimal  @db.Decimal(12, 2) // en moneda de la venta
+  priceBs   Decimal  @db.Decimal(12, 2) // calculado en Bs
+  isFree    Boolean  @default(false)
+  sale      Sale     @relation(fields: [saleId], references: [id])
+  product   Product? @relation(fields: [productId], references: [id])
+}
+
+model SalePayment {
+  id        Int           @id @default(autoincrement())
+  saleId    Int
+  method    PaymentMethod
+  currency  Currency
+  rate      Decimal       @db.Decimal(12, 6)
+  amount    Decimal       @db.Decimal(12, 2) // en moneda del pago
+  amountBs  Decimal       @db.Decimal(12, 2)
+  amountUsd Decimal       @db.Decimal(12, 2)
+  note      String?
+  createdAt DateTime      @default(now())
+  sale      Sale          @relation(fields: [saleId], references: [id])
+}
+
+model InventoryMovement {
+  id            Int           @id @default(autoincrement())
+  productId     Int
+  type          MovementType
+  quantity      Decimal       @db.Decimal(12, 3)
+  unitCostBs    Decimal       @db.Decimal(12, 2)
+  referenceType ReferenceType
+  referenceId   Int
+  date          DateTime      @default(now())
+  product       Product       @relation(fields: [productId], references: [id])
+}
+
+model UserCategory {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  categoryId Int
+  user       User     @relation(fields: [userId], references: [id])
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@unique([userId, categoryId])
+}
+
+model ExchangeRateLog {
+  id        Int        @id @default(autoincrement())
+  source    RateSource
+  value     Decimal    @db.Decimal(12, 6)
+  timestamp DateTime   @default(now())
+}
+
+enum Unit {
+  UNIT
+  KG
+}
+
+enum Role {
+  admin
+  seller
+}
+
+enum MovementType {
+  IN
+  OUT
+}
+
+enum ReferenceType {
+  PURCHASE
+  SALE
+  ADJUST
+}
+
+enum Currency {
+  USD
+  BS
+}
+
+enum RateSource {
+  bcv
+  manual
+}
+
+enum PaymentMethod {
+  CASH_BS
+  CASH_USD
+  DEBIT_CARD
+  PAGO_MOVIL
+  TRANSFER_BS
+  TRANSFER_USD
+}
+
+enum SaleStatus {
+  OPEN
+  PARTIAL
+  PAID
+  VOID
+}
